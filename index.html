@@ -1,92 +1,197 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>SmartAI Proposal Builder (Demo UI)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartAI Proposal Builder — Demo UI</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 24px; max-width: 900px; }
-    button { padding: 8px 14px; margin-right: 8px; cursor: pointer; }
-    .row { margin: 12px 0; }
-    textarea, pre { width: 100%; min-height: 140px; }
-    input[type="text"] { width: 420px; }
-    code { background:#f6f6f6; padding:2px 6px; border-radius:6px; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; line-height: 1.35;}
+    input, button, textarea { font: inherit; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .muted { color: #6b7280; }
+    .ok { color: #10b981; font-weight: 600; }
+    .bad { color: #ef4444; font-weight: 600; }
+    .grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#f3f4f6; margin-right:6px; }
+    label.chk { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid #e5e7eb; border-radius:8px; }
+    .small { font-size: 12px; }
   </style>
 </head>
 <body>
   <h1>SmartAI Proposal Builder — Demo UI</h1>
 
   <div class="row">
-    <label>API base URL: </label>
-    <input id="apiBase" type="text" value="https://sgdev-smartai-api-01.azurewebsites.net" />
-    <button onclick="ping()">Ping /health</button>
-    <span id="pingOut"></span>
+    <label>API base URL: 
+      <input id="apiBase" size="60" value="https://sgdev-smartai-api-01.azurewebsites.net">
+    </label>
+    <button id="btnPing">Ping /health</button>
+    <span id="pingOut" class="muted">—</span>
   </div>
 
-  <div class="row">
-    <button onclick="createSession()">1) Create Session</button>
-    <span>session_id: <code id="sid">(none)</code></span>
-  </div>
-
-  <div class="row">
-    <button onclick="loadChecklist()">2) Get Checklist</button>
-  </div>
-  <pre id="checklist"></pre>
-
-  <div class="row">
-    <h3>3) Draft “business_case”</h3>
-    <textarea id="prompt" placeholder="Write the draft about…">Our revenue fell 12% due to low education and confidence in AI; propose a plan.</textarea>
-    <div>
-      <button onclick="draft()">Draft</button>
+  <div class="card">
+    <div class="row">
+      <button id="btnSession">1) Create Session</button>
+      <div>session_id: <span id="sid" class="mono muted">(none)</span></div>
     </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnChecklist" disabled>2) Get Checklist</button>
+      <button id="btnEvidenceList" disabled>List Evidence (debug)</button>
+    </div>
+    <div id="checklist" class="grid"></div>
+    <div id="evidenceDebug" class="card small" style="display:none"></div>
   </div>
 
-  <h3>Output</h3>
-  <pre id="output"></pre>
+  <div class="card">
+    <h3>3) Draft “business_case”</h3>
+    <p class="small muted">Tick evidence labels above (or leave none to use section defaults). You can also cap concatenated evidence characters.</p>
+    <div class="row">
+      <label>evidence_char_cap: <input id="cap" type="number" min="500" step="500" placeholder="6000" style="width:120px"></label>
+      <label>length_limit (words): <input id="lenLimit" type="number" min="50" step="50" value="300" style="width:120px"></label>
+      <label>Style: <input id="style" size="28" value="Formal, outcome-oriented"></label>
+    </div>
+    <p class="small muted">Prompt</p>
+    <textarea id="prompt" rows="5" style="width:100%;">Our revenue fell 12% due to low education and confidence in AI; propose a plan.</textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="btnDraft">Draft</button>
+      <span id="draftInfo" class="muted"></span>
+    </div>
+    <h4>Output</h4>
+    <div id="out" class="mono"></div>
+    <div id="meta" class="small muted"></div>
+  </div>
 
-<script>
-  function base() { return document.getElementById('apiBase').value.replace(/\/+$/,''); }
-  function set(id, val){ document.getElementById(id).textContent = typeof val==='string' ? val : JSON.stringify(val, null, 2); }
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let state = { sessionId: null, labelsFromChecklist: [] };
 
-  async function ping() {
-    try {
-      const r = await fetch(base() + '/health');
-      set('pingOut', r.ok ? 'OK' : ('HTTP ' + r.status));
-    } catch (e) { set('pingOut', 'Error'); }
-  }
+    function api(path, opts={}) {
+      const base = $("apiBase").value.replace(/\/+$/,'');
+      return fetch(base + path, opts);
+    }
 
-  async function createSession(){
-    const r = await fetch(base() + '/v1/session', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ grant:'EDG', company_name:'SmartGrant Pte Ltd' })
-    });
-    const j = await r.json();
-    set('sid', j.session_id || '(error)');
-  }
-
-  async function loadChecklist(){
-    const sid = document.getElementById('sid').textContent;
-    if (!sid || sid === '(none)') { alert('Create a session first'); return; }
-    const r = await fetch(base() + `/v1/session/${sid}/checklist`);
-    const j = await r.json();
-    set('checklist', j);
-  }
-
-  async function draft() {
-    const sid = document.getElementById('sid').textContent;
-    if (!sid || sid === '(none)') { alert('Create a session first'); return; }
-    const prompt = document.getElementById('prompt').value;
-    const body = {
-      session_id: sid,
-      section_id: 'business_case',
-      inputs: { style: 'Formal, outcome-oriented', length_limit: 300, prompt }
+    // Ping
+    $("btnPing").onclick = async () => {
+      $("pingOut").textContent = "…";
+      try {
+        const r = await api("/health");
+        const ok = r.ok ? "OK" : "NOT OK";
+        $("pingOut").textContent = ok;
+        $("pingOut").className = r.ok ? "ok" : "bad";
+      } catch(e) {
+        $("pingOut").textContent = "error";
+        $("pingOut").className = "bad";
+      }
     };
-    const r = await fetch(base() + '/v1/grants/edg/draft', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-    });
-    const j = await r.json();
-    set('output', j);
-  }
-</script>
+
+    // Create session
+    $("btnSession").onclick = async () => {
+      const body = { grant: "EDG", company_name: "SmartGrant Pte Ltd" };
+      const r = await api("/v1/session", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(body)
+      });
+      const j = await r.json();
+      state.sessionId = j.session_id;
+      $("sid").textContent = state.sessionId || "(none)";
+      $("btnChecklist").disabled = !state.sessionId;
+      $("btnEvidenceList").disabled = !state.sessionId;
+      $("checklist").innerHTML = "";
+      state.labelsFromChecklist = [];
+      $("evidenceDebug").style.display = "none";
+    };
+
+    // Get checklist and render upload items as checkboxes
+    $("btnChecklist").onclick = async () => {
+      if (!state.sessionId) return;
+      const r = await api(`/v1/session/${encodeURIComponent(state.sessionId)}/checklist`);
+      const j = await r.json();
+      const host = $("checklist");
+      host.innerHTML = "";
+      state.labelsFromChecklist = [];
+      (j.items || j || []).forEach(item => {
+        // expect items like { id, type, label, ... }
+        if (item.type === "upload") {
+          state.labelsFromChecklist.push(item.label);
+          const div = document.createElement("label");
+          div.className = "chk";
+          div.innerHTML = `
+            <input type="checkbox" data-label="${item.label}">
+            <span><span class="pill">${item.label}</span><span class="muted small">${item.description || ""}</span></span>
+          `;
+          host.appendChild(div);
+        }
+      });
+      if (!state.labelsFromChecklist.length) {
+        host.innerHTML = `<div class="muted small">No upload items in checklist. Defaults will be used per section.</div>`;
+      }
+    };
+
+    // Optional: list evidence files detected server-side
+    $("btnEvidenceList").onclick = async () => {
+      if (!state.sessionId) return;
+      const r = await api(`/v1/debug/evidence/${encodeURIComponent(state.sessionId)}?preview=120`);
+      const j = await r.json();
+      const box = $("evidenceDebug");
+      const items = (j.items || []);
+      if (!items.length) {
+        box.innerHTML = `<div class="muted small">No evidence text found for this session yet.</div>`;
+      } else {
+        box.innerHTML = `<strong>Evidence on server:</strong><br>` + items.map(it =>
+          `<div><span class="pill">${it.label}</span> <span class="muted small">(${it.chars||0} chars)</span><div class="small mono">${(it.preview||"").replaceAll("<","&lt;")}</div></div>`
+        ).join("");
+      }
+      box.style.display = "block";
+    };
+
+    // Draft
+    $("btnDraft").onclick = async () => {
+      if (!state.sessionId) { alert("Create a session first"); return; }
+
+      // gather checked labels; if none, omit to use defaults
+      const checked = [...document.querySelectorAll('#checklist input[type="checkbox"]:checked')]
+                       .map(x => x.dataset.label);
+
+      const inputs = {
+        style: $("style").value || "Formal, outcome-oriented",
+        length_limit: parseInt($("lenLimit").value || "300", 10),
+        prompt: $("prompt").value
+      };
+      const cap = parseInt($("cap").value || "0", 10);
+      if (cap > 0) inputs.evidence_char_cap = cap;
+      if (checked.length) inputs.evidence_labels = checked;
+
+      $("draftInfo").textContent = "Submitting…";
+      $("out").textContent = "";
+      $("meta").textContent = "";
+
+      const r = await api("/v1/grants/edg/draft", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          session_id: state.sessionId,
+          section_id: "business_case",
+          inputs
+        })
+      });
+
+      const j = await r.json().catch(()=>({ error:"Bad JSON" }));
+      if (!r.ok) {
+        $("draftInfo").textContent = "Error";
+        $("out").textContent = JSON.stringify(j, null, 2);
+        $("out").className = "mono bad";
+        return;
+      }
+
+      $("draftInfo").textContent = "Done";
+      $("out").className = "mono";
+      $("out").textContent = j.output || "";
+      const pills = (j.evidence_used || []).map(l => `<span class="pill">${l}</span>`).join("");
+      $("meta").innerHTML =
+        `Framework: <b>${j.framework}</b> &nbsp; | &nbsp; Evidence used: ${pills} &nbsp; | &nbsp; Score: <b>${j.evaluation?.score ?? "-"}</b>`;
+    };
+  </script>
 </body>
 </html>
