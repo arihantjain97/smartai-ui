@@ -66,8 +66,21 @@
     const $ = (id) => document.getElementById(id);
     let state = { sessionId: null, labelsFromChecklist: [] };
 
+    // Load from localStorage on page load
+    if (localStorage.getItem("apiBase")) {
+      $("apiBase").value = localStorage.getItem("apiBase");
+    }
+    if (localStorage.getItem("sid")) {
+      state.sessionId = localStorage.getItem("sid");
+      $("sid").textContent = state.sessionId || "(none)";
+      $("btnChecklist").disabled = !state.sessionId;
+      $("btnEvidenceList").disabled = !state.sessionId;
+    }
+
     function api(path, opts={}) {
       const base = $("apiBase").value.replace(/\/+$/,'');
+      // Save API base to localStorage
+      localStorage.setItem("apiBase", base);
       return fetch(base + path, opts);
     }
 
@@ -96,6 +109,8 @@
       const j = await r.json();
       state.sessionId = j.session_id;
       $("sid").textContent = state.sessionId || "(none)";
+      // Save session ID to localStorage
+      localStorage.setItem("sid", state.sessionId);
       $("btnChecklist").disabled = !state.sessionId;
       $("btnEvidenceList").disabled = !state.sessionId;
       $("checklist").innerHTML = "";
@@ -158,47 +173,60 @@
     $("btnDraft").onclick = async () => {
       if (!state.sessionId) { alert("Create a session first"); return; }
 
-      // gather checked labels; if none, omit to use defaults
-      const checked = [...document.querySelectorAll('#checklist input[type="checkbox"]:checked')]
-                       .map(x => x.dataset.label);
+      // Disable button while submitting
+      $("btnDraft").disabled = true;
+      
+      try {
+        // gather checked labels; if none, omit to use defaults
+        const checked = [...document.querySelectorAll('#checklist input[type="checkbox"]:checked')]
+                         .map(x => x.dataset.label);
 
-      const inputs = {
-        style: $("style").value || "Formal, outcome-oriented",
-        length_limit: parseInt($("lenLimit").value || "300", 10),
-        prompt: $("prompt").value
-      };
-      const cap = parseInt($("cap").value || "0", 10);
-      if (cap > 0) inputs.evidence_char_cap = cap;
-      if (checked.length) inputs.evidence_labels = checked;
+        const inputs = {
+          style: $("style").value || "Formal, outcome-oriented",
+          length_limit: parseInt($("lenLimit").value || "300", 10),
+          prompt: $("prompt").value
+        };
+        const cap = parseInt($("cap").value || "0", 10);
+        if (cap > 0) inputs.evidence_char_cap = cap;
+        if (checked.length) inputs.evidence_labels = checked;
 
-      $("draftInfo").textContent = "Submitting…";
-      $("out").textContent = "";
-      $("meta").textContent = "";
+        $("draftInfo").textContent = "Submitting…";
+        $("out").textContent = "";
+        $("meta").textContent = "";
 
-      const r = await api("/v1/grants/edg/draft", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          session_id: state.sessionId,
-          section_id: "business_case",
-          inputs
-        })
-      });
+        const r = await api("/v1/grants/edg/draft", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            section_id: "business_case",
+            inputs
+          })
+        });
 
-      const j = await r.json().catch(()=>({ error:"Bad JSON" }));
-      if (!r.ok) {
+        const j = await r.json().catch(()=>({ error:"Bad JSON" }));
+        if (!r.ok) {
+          $("draftInfo").textContent = "Error";
+          $("out").textContent = JSON.stringify(j, null, 2);
+          $("out").className = "mono bad";
+          return;
+        }
+
+        $("draftInfo").textContent = "Done";
+        $("out").className = "mono";
+        $("out").textContent = j.output || "";
+        const pills = (j.evidence_used || []).map(l => `<span class="pill">${l}</span>`).join("");
+        $("meta").innerHTML =
+          `Framework: <b>${j.framework}</b> &nbsp; | &nbsp; Evidence used: ${pills} &nbsp; | &nbsp; Score: <b>${j.evaluation?.score ?? "-"}</b>`;
+      } catch (error) {
+        // Handle any unexpected errors
         $("draftInfo").textContent = "Error";
-        $("out").textContent = JSON.stringify(j, null, 2);
+        $("out").textContent = "Unexpected error: " + error.message;
         $("out").className = "mono bad";
-        return;
+      } finally {
+        // Re-enable button
+        $("btnDraft").disabled = false;
       }
-
-      $("draftInfo").textContent = "Done";
-      $("out").className = "mono";
-      $("out").textContent = j.output || "";
-      const pills = (j.evidence_used || []).map(l => `<span class="pill">${l}</span>`).join("");
-      $("meta").innerHTML =
-        `Framework: <b>${j.framework}</b> &nbsp; | &nbsp; Evidence used: ${pills} &nbsp; | &nbsp; Score: <b>${j.evaluation?.score ?? "-"}</b>`;
     };
   </script>
 </body>
