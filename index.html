@@ -77,6 +77,20 @@
       $("btnEvidenceList").disabled = !state.sessionId;
     }
 
+    // Feature flag check - remove PSG option if not enabled
+    (async () => {
+      try {
+        const base = $("apiBase").value.replace(/\/+$/,'');
+        const r = await fetch(base + '/v1/config/features');
+        const f = await r.json();
+        if (!f.feature_psg_enabled) {
+          document.querySelector('#psgOption')?.remove();
+        }
+      } catch (error) {
+        console.log('Feature flag check failed:', error);
+      }
+    })();
+
     function api(path, opts={}) {
       const base = $("apiBase").value.replace(/\/+$/,'');
       // Save API base to localStorage
