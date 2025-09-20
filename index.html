@@ -108,22 +108,30 @@
       if (!state.sessionId) return;
       const r = await api(`/v1/session/${encodeURIComponent(state.sessionId)}/checklist`);
       const j = await r.json();
+
       const host = $("checklist");
       host.innerHTML = "";
       state.labelsFromChecklist = [];
-      (j.items || j || []).forEach(item => {
-        // expect items like { id, type, label, ... }
+
+      const items = Array.isArray(j.tasks) ? j.tasks
+                  : Array.isArray(j.items) ? j.items : [];
+
+      items.forEach(item => {
         if (item.type === "upload") {
-          state.labelsFromChecklist.push(item.label);
+          const label = item.label || item.id; // prefer .label, fallback .id
+          state.labelsFromChecklist.push(label);
+
           const div = document.createElement("label");
           div.className = "chk";
           div.innerHTML = `
-            <input type="checkbox" data-label="${item.label}">
-            <span><span class="pill">${item.label}</span><span class="muted small">${item.description || ""}</span></span>
+            <input type="checkbox" data-label="${label}">
+            <span><span class="pill">${label}</span>
+            <span class="muted small">${item.description || ""}</span></span>
           `;
           host.appendChild(div);
         }
       });
+
       if (!state.labelsFromChecklist.length) {
         host.innerHTML = `<div class="muted small">No upload items in checklist. Defaults will be used per section.</div>`;
       }
