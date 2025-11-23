@@ -5,6 +5,7 @@
 // State
 let state = {
   apiBase: "https://sgdev-smartai-api-01.azurewebsites.net",
+  uploadBrokerBase: "https://sgdev-smartai-func-sas-ehbpeahwg2b6bzcy.southeastasia-01.azurewebsites.net",
   env: {
     feature_psg_enabled: false,
     model_worker: null,
@@ -66,6 +67,27 @@ async function apiGet(path) {
 async function apiPost(path, body) {
   const base = getApiBase();
   const res = await fetch(`${base}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let error;
+    try {
+      error = JSON.parse(text);
+    } catch {
+      error = { error: text };
+    }
+    throw new Error(error.error || `HTTP ${res.status}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+async function brokerPost(path, body) {
+  const base = state.uploadBrokerBase.replace(/\/+$/, "");
+  const url = base + path;
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -366,6 +388,12 @@ function renderStep1() {
                   } else if (uploadStatus === "uploaded") {
                     statusText = "Uploaded (pending parse)";
                     statusClass = "bg-yellow-100 text-yellow-700";
+                  } else if (uploadStatus === "uploading") {
+                    statusText = "Uploading…";
+                    statusClass = "bg-blue-100 text-blue-700";
+                  } else if (uploadStatus === "error") {
+                    statusText = "Upload failed";
+                    statusClass = "bg-red-100 text-red-700";
                   }
                   return `
                     <tr>
@@ -776,10 +804,72 @@ async function handleLoadChecklist() {
   }
 }
 
-function handleFileSelect(label, input) {
-  if (input.files && input.files.length > 0) {
+async function handleFileSelect(label, input) {
+  // Guard: require session
+  if (!state.sessionId) {
+    alert("Create Run first before uploading evidence.");
+    input.value = "";
+    return;
+  }
+
+  // Extract file
+  const file = input.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  // Prevent double upload if already uploading
+  if (state.evidenceUploadStatus[label] === "uploading") {
+    alert("Upload already in progress. Please wait.");
+    input.value = "";
+    return;
+  }
+
+  try {
+    // Set status to uploading
+    state.evidenceUploadStatus[label] = "uploading";
+    renderStepPanel();
+
+    // Get SAS URL from broker
+    const sasResp = await brokerPost("/api/upload/sas", {
+      sid: state.sessionId,
+      label: label,
+      filename: file.name
+    });
+
+    // PUT file to blob storage
+    const putRes = await fetch(sasResp.uploadUrl, {
+      method: "PUT",
+      headers: {
+        "x-ms-blob-type": "BlockBlob",
+        "Content-Type": file.type || "application/octet-stream"
+      },
+      body: file
+    });
+
+    if (!putRes.ok) {
+      throw new Error(`Blob upload failed: HTTP ${putRes.status}`);
+    }
+
+    // Success: mark as uploaded
     state.evidenceUploadStatus[label] = "uploaded";
     renderStepPanel();
+
+    // Optional non-blocking alert
+    setTimeout(() => {
+      alert("Uploaded. Parsing will take a few seconds; click Refresh Evidence Detected.");
+    }, 100);
+
+  } catch (error) {
+    // Failure: mark as error
+    state.evidenceUploadStatus[label] = "error";
+    renderStepPanel();
+
+    // Alert with error details
+    alert(`Upload failed: ${error.message}\n\nPlease try again or check your connection.`);
+    
+    // Reset input to allow retry
+    input.value = "";
   }
 }
 
