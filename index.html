@@ -403,7 +403,7 @@
         <div>
           <div class="card-title">3) Draft section</div>
           <div class="card-subtitle">
-            SmartAI uses the selected grant, checklist labels, and evidence to draft a section.
+            Select a section from "Available to Draft" above, then SmartAI will draft it using the selected grant, checklist labels, and evidence.
           </div>
         </div>
         <span class="badge">
@@ -447,7 +447,13 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    let state = { sessionId: null, labelsFromChecklist: [], grant: "EDG" };
+    let state = { 
+      sessionId: null, 
+      labelsFromChecklist: [], 
+      grant: "EDG",
+      selectedSection: null,
+      selectedSectionVariant: null
+    };
 
     // ---- Load persisted state ----
     if (localStorage.getItem("apiBase")) {
@@ -501,8 +507,13 @@
     }
 
     function updateSectionLabel() {
-      const lbl = (state.grant === "PSG") ? "business_impact (PSG)" : "business_case (EDG)";
-      $("sectionLabel").textContent = lbl;
+      if (state.selectedSection) {
+        const variant = state.selectedSectionVariant ? ` (${state.selectedSectionVariant})` : "";
+        $("sectionLabel").textContent = `${state.selectedSection}${variant}`;
+      } else {
+        const lbl = (state.grant === "PSG") ? "business_impact (PSG)" : "business_case (EDG)";
+        $("sectionLabel").textContent = lbl;
+      }
     }
 
     // ---- Ping /health ----
@@ -547,6 +558,9 @@
       $("btnEvidenceList").disabled = !state.sessionId;
       $("checklist").innerHTML = "";
       state.labelsFromChecklist = [];
+      state.selectedSection = null;
+      state.selectedSectionVariant = null;
+      updateSectionLabel();
       $("evidenceDebug").style.display = "none";
       // clear validation banner
       hideValidationBanner();
@@ -561,6 +575,9 @@
       const host = $("checklist");
       host.innerHTML = "";
       state.labelsFromChecklist = [];
+      state.selectedSection = null;
+      state.selectedSectionVariant = null;
+      updateSectionLabel();
 
       const items = Array.isArray(j.tasks) ? j.tasks
                   : Array.isArray(j.items) ? j.items : [];
@@ -609,20 +626,63 @@
         draftSection.appendChild(draftTitle);
 
         draftTasks.forEach(item => {
+          const sectionId = item.id;
           const label = item.label || item.id;
           const sectionVariant = item.section_variant ? ` (${item.section_variant})` : "";
+          const isSelected = state.selectedSection === sectionId && 
+                            state.selectedSectionVariant === (item.section_variant || null);
 
           const div = document.createElement("div");
           div.className = "chk";
-          div.style.cursor = "default";
+          div.style.cursor = "pointer";
+          div.dataset.sectionId = sectionId;
+          div.dataset.sectionVariant = item.section_variant || "";
+          if (isSelected) {
+            div.style.background = "var(--accent-soft)";
+            div.style.borderColor = "var(--accent)";
+            div.style.borderWidth = "2px";
+          }
           div.innerHTML = `
             <span>
-              <span class="pill" style="background: var(--accent-soft); border-color: var(--accent); color: var(--text);">
+              <span class="pill" style="background: ${isSelected ? 'var(--accent)' : 'var(--accent-soft)'}; border-color: var(--accent); color: ${isSelected ? '#ffffff' : 'var(--text)'};">
                 ✏️ ${label}${sectionVariant}
               </span>
               <span class="muted small">${item.description || ""}</span>
             </span>
           `;
+          div.onclick = () => {
+            // Update selection
+            state.selectedSection = sectionId;
+            state.selectedSectionVariant = item.section_variant || null;
+            updateSectionLabel();
+            
+            // Update visual selection
+            draftSection.querySelectorAll('.chk').forEach(el => {
+              const elSectionId = el.dataset.sectionId;
+              const elSectionVariant = el.dataset.sectionVariant || null;
+              const isElSelected = state.selectedSection === elSectionId && 
+                                  state.selectedSectionVariant === elSectionVariant;
+              if (isElSelected) {
+                el.style.background = "var(--accent-soft)";
+                el.style.borderColor = "var(--accent)";
+                el.style.borderWidth = "2px";
+                const pill = el.querySelector('.pill');
+                if (pill) {
+                  pill.style.background = "var(--accent)";
+                  pill.style.color = "#ffffff";
+                }
+              } else {
+                el.style.background = "";
+                el.style.borderColor = "";
+                el.style.borderWidth = "";
+                const pill = el.querySelector('.pill');
+                if (pill) {
+                  pill.style.background = "var(--accent-soft)";
+                  pill.style.color = "var(--text)";
+                }
+              }
+            });
+          };
           draftSection.appendChild(div);
         });
         host.appendChild(draftSection);
@@ -724,6 +784,7 @@
     // ---- Draft ----
     $("btnDraft").onclick = async () => {
       if (!state.sessionId) { alert("Create a session first"); return; }
+      if (!state.selectedSection) { alert("Please select a section from 'Available to Draft' first"); return; }
 
       $("btnDraft").disabled = true;
       hideValidationBanner();
@@ -745,17 +806,21 @@
       $("out").textContent = "";
       $("meta").textContent = "";
 
-        // decide section_id based on grant
-        const section_id = (state.grant === "PSG") ? "business_impact" : "business_case";
+        // Use selected section from checklist
+        const section_id = state.selectedSection;
+        const payload = {
+          session_id: state.sessionId,
+          section_id,
+          inputs
+        };
+        if (state.selectedSectionVariant) {
+          payload.section_variant = state.selectedSectionVariant;
+        }
 
         const r = await api("/v1/draft", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          session_id: state.sessionId,
-            section_id,
-          inputs
-        })
+        body: JSON.stringify(payload)
       });
 
       const j = await r.json().catch(()=>({ error:"Bad JSON" }));
