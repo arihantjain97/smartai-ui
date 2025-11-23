@@ -565,8 +565,21 @@
       const items = Array.isArray(j.tasks) ? j.tasks
                   : Array.isArray(j.items) ? j.items : [];
 
-      items.forEach(item => {
-        if (item.type === "upload") {
+      // Separate upload and draft tasks
+      const uploadTasks = items.filter(item => item.type === "upload");
+      const draftTasks = items.filter(item => item.type === "draft");
+
+      // Display upload tasks
+      if (uploadTasks.length > 0) {
+        const uploadSection = document.createElement("div");
+        uploadSection.style.marginBottom = "16px";
+        const uploadTitle = document.createElement("h4");
+        uploadTitle.textContent = "Upload Required";
+        uploadTitle.style.marginBottom = "8px";
+        uploadTitle.style.color = "var(--text)";
+        uploadSection.appendChild(uploadTitle);
+
+        uploadTasks.forEach(item => {
           const label = item.label || item.id;
           state.labelsFromChecklist.push(label);
 
@@ -575,16 +588,48 @@
           div.innerHTML = `
             <input type="checkbox" data-label="${label}">
             <span>
-              <span class="pill">${label}</span>
+              <span class="pill" style="background: var(--warning-soft); border-color: var(--warning); color: var(--text);">
+                📤 ${label}
+              </span>
               <span class="muted small">${item.description || ""}</span>
             </span>
           `;
-          host.appendChild(div);
-        }
-      });
+          uploadSection.appendChild(div);
+        });
+        host.appendChild(uploadSection);
+      }
 
-      if (!state.labelsFromChecklist.length) {
-        host.innerHTML = `<div class="muted small">No upload items in checklist. Defaults will be used per section.</div>`;
+      // Display draft tasks
+      if (draftTasks.length > 0) {
+        const draftSection = document.createElement("div");
+        const draftTitle = document.createElement("h4");
+        draftTitle.textContent = "Available to Draft";
+        draftTitle.style.marginBottom = "8px";
+        draftTitle.style.color = "var(--text)";
+        draftSection.appendChild(draftTitle);
+
+        draftTasks.forEach(item => {
+          const label = item.label || item.id;
+          const sectionVariant = item.section_variant ? ` (${item.section_variant})` : "";
+
+          const div = document.createElement("div");
+          div.className = "chk";
+          div.style.cursor = "default";
+          div.innerHTML = `
+            <span>
+              <span class="pill" style="background: var(--accent-soft); border-color: var(--accent); color: var(--text);">
+                ✏️ ${label}${sectionVariant}
+              </span>
+              <span class="muted small">${item.description || ""}</span>
+            </span>
+          `;
+          draftSection.appendChild(div);
+        });
+        host.appendChild(draftSection);
+      }
+
+      if (items.length === 0) {
+        host.innerHTML = `<div class="muted small">No tasks in checklist.</div>`;
       }
     };
 
