@@ -5,74 +5,451 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SmartAI Proposal Builder — Demo UI</title>
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; line-height: 1.35;}
-    input, button, textarea { font: inherit; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 12px 0; }
-    .muted { color: #6b7280; }
-    .ok { color: #10b981; font-weight: 600; }
-    .bad { color: #ef4444; font-weight: 600; }
-    .grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
-    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#f3f4f6; margin-right:6px; }
-    label.chk { display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid #e5e7eb; border-radius:8px; }
-    .small { font-size: 12px; }
+    :root {
+      --bg: #ffffff;
+      --card-bg: #ffffff;
+      --card-border: #e5e7eb;
+      --accent: #22c55e;
+      --accent-soft: rgba(34,197,94,0.1);
+      --text: #111827;
+      --muted: #6b7280;
+      --danger: #ef4444;
+      --danger-soft: rgba(239,68,68,0.1);
+      --warning: #f59e0b;
+      --warning-soft: rgba(245,158,11,0.1);
+      --pill-bg: #f3f4f6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      margin: 0;
+      padding: 32px;
+      line-height: 1.6;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 15px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      line-height: 1.3;
+    }
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      line-height: 1.3;
+    }
+    h4 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 6px;
+      line-height: 1.4;
+    }
+    p { 
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+
+
+
+    input, button, textarea, select {
+      font: inherit;
+      color: var(--text);
+    }
+    input, textarea, select {
+      background: #ffffff;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      padding: 10px 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      transition: all 150ms ease;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 0;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.1);
+    }
+    button {
+      border-radius: 8px;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      background: linear-gradient(to right, #22c55e, #16a34a);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 150ms ease;
+      box-shadow: 0 2px 8px rgba(34,197,94,0.2);
+      line-height: 1.5;
+    }
+    button[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:not([disabled]):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(34,197,94,0.3);
+    }
+
+
+
+    .layout {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .header-sub {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+    .env-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 13px;
+      margin-bottom: 24px;
+      padding: 12px 0;
+    }
+    .pill {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 12px;
+      border-radius:999px;
+      background: var(--pill-bg);
+      border: 1px solid #e5e7eb;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .pill strong {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .row-right {
+      margin-left: auto;
+    }
+
+
+
+    .card {
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 0;
+      background: var(--card-bg);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      transition: box-shadow 150ms ease;
+    }
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .card-header {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      margin-bottom:16px;
+      gap: 16px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 1.3;
+      color: var(--text);
+    }
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+
+
+    .muted { color: var(--muted); }
+    .ok { color: var(--accent); font-weight: 600; }
+    .bad { color: var(--danger); font-weight: 600; }
+
+
+
+    .grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+      font-family: inherit;
+    }
+    label.chk {
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      background:#f9fafb;
+      transition: all 150ms ease;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    label.chk:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+    .small { 
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      display: block;
+      margin-bottom: 6px;
+    }
+    
+    label.small {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+
+
+    .validation-banner {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .validation-banner.warning {
+      background: var(--warning-soft);
+      border: 1px solid var(--warning);
+      color: var(--text);
+    }
+    .validation-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--warning);
+    }
+
+
+
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 12px;
+      border-radius:999px;
+      background:#f3f4f6;
+      border:1px solid #e5e7eb;
+      font-size:12px;
+      color:var(--muted);
+      font-weight: 500;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
-  <h1>SmartAI Proposal Builder — Demo UI</h1>
+  <div class="layout">
 
+    <header class="header">
+      <div>
+        <h1>SmartAI Proposal Builder</h1>
+        <div class="header-sub">EDG &amp; PSG drafts from one backend — demo workspace</div>
+      </div>
   <div class="row">
-    <label>API base URL: 
-      <input id="apiBase" size="60" value="https://sgdev-smartai-api-01.azurewebsites.net">
+        <label class="small muted">
+          API base URL:<br/>
+          <input id="apiBase" size="40" value="https://sgdev-smartai-api-01.azurewebsites.net">
     </label>
+        <div>
     <button id="btnPing">Ping /health</button>
-    <span id="pingOut" class="muted">—</span>
+          <div id="pingOut" class="small muted" style="margin-top:4px;">—</div>
+        </div>
   </div>
+    </header>
 
-  <div class="card">
-    <div class="row">
-      <button id="btnSession">1) Create Session</button>
-      <div>session_id: <span id="sid" class="mono muted">(none)</span></div>
+    <!-- Environment strip -->
+    <div class="env-strip">
+      <span class="pill"><strong>Environment</strong> <span id="envLabel">loading…</span></span>
+      <span class="pill"><strong>Pack</strong> <span id="envPack">—</span></span>
+      <span class="pill"><strong>Model</strong> <span id="envModel">—</span></span>
+      <span class="pill"><strong>PSG</strong> <span id="envPsg">—</span></span>
     </div>
-    <div class="row" style="margin-top:8px">
-      <button id="btnChecklist" disabled>2) Get Checklist</button>
-      <button id="btnEvidenceList" disabled>List Evidence (debug)</button>
+
+    <!-- Validation banner -->
+    <div id="validationBanner" class="validation-banner">
+      <div class="validation-dot"></div>
+      <span id="validationSummary"></span>
+      <span id="validationDetails" class="small muted"></span>
     </div>
+
+    <!-- Session + checklist -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">1) Session &amp; Checklist</div>
+          <div class="card-subtitle">Choose grant, create a session, then fetch the grant-aware checklist.</div>
+        </div>
+        <span class="badge">Session: <span id="sid" class="mono muted">(none)</span></span>
+      </div>
+
+      <div class="row" style="margin-bottom:8px;">
+        <label class="small muted">
+          Grant type<br/>
+          <select id="grantSelect">
+            <option value="EDG">EDG (Enterprise Development Grant)</option>
+            <option value="PSG">PSG (Productivity Solutions Grant)</option>
+          </select>
+        </label>
+        <button id="btnSession">Create Session</button>
+        <button id="btnChecklist" disabled>Get Checklist</button>
+        <button id="btnEvidenceList" disabled>Evidence inspector</button>
+      </div>
+
     <div id="checklist" class="grid"></div>
-    <div id="evidenceDebug" class="card small" style="display:none"></div>
+      <div id="evidenceDebug" class="card small" style="display:none; margin-top:10px;"></div>
   </div>
 
-  <div id="psgOption" class="card">
-    <h3>PSG Feature</h3>
-    <p class="small muted">This section is only visible when PSG is enabled.</p>
-    <button id="btnPsg" disabled>PSG Action</button>
-  </div>
-
+    <!-- Session facts & validation -->
   <div class="card">
-    <h3>3) Draft “business_case”</h3>
-    <p class="small muted">Tick evidence labels above (or leave none to use section defaults). You can also cap concatenated evidence characters.</p>
-    <div class="row">
-      <label>evidence_char_cap: <input id="cap" type="number" min="500" step="500" placeholder="6000" style="width:120px"></label>
-      <label>length_limit (words): <input id="lenLimit" type="number" min="50" step="50" value="300" style="width:120px"></label>
-      <label>Style: <input id="style" size="28" value="Formal, outcome-oriented"></label>
+      <div class="card-header">
+        <div>
+          <div class="card-title">2) Company facts &amp; validation (non-blocking)</div>
+          <div class="card-subtitle">
+            Capture eligibility facts (e.g. local equity) and run validation without blocking drafting.
+          </div>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <label class="small muted">
+          Local equity (%)
+          <br/>
+          <input id="factEquity" type="number" min="0" max="100" placeholder="e.g. 45">
+        </label>
+        <label class="small muted">
+          Turnover (SGD)
+          <br/>
+          <input id="factTurnover" type="number" min="0" placeholder="optional">
+        </label>
+        <label class="small muted">
+          Headcount
+          <br/>
+          <input id="factHeadcount" type="number" min="0" placeholder="optional">
+        </label>
+        <button id="btnValidate" class="row-right">Save facts &amp; validate</button>
+      </div>
+      <div class="small muted">
+        Example: for PSG, setting <code>local_equity_pct &lt; 30</code> will surface a non-blocking eligibility warning.
+      </div>
+    </div>
+
+    <!-- Drafting card -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">3) Draft section</div>
+          <div class="card-subtitle">
+            SmartAI uses the selected grant, checklist labels, and evidence to draft a section.
+          </div>
+        </div>
+        <span class="badge">
+          Section:
+          <span id="sectionLabel">business_case (EDG)</span>
+        </span>
+      </div>
+
+      <p class="small muted">
+        Tick evidence labels above (or leave none to use section defaults). You can also cap concatenated evidence characters.
+      </p>
+      <div class="row" style="margin-bottom:8px;">
+        <label class="small muted">
+          evidence_char_cap
+          <br/>
+          <input id="cap" type="number" min="500" step="500" placeholder="6000" style="width:120px">
+        </label>
+        <label class="small muted">
+          length_limit (words)
+          <br/>
+          <input id="lenLimit" type="number" min="50" step="50" value="300" style="width:120px">
+        </label>
+        <label class="small muted">
+          Style
+          <br/>
+          <input id="style" size="28" value="Formal, outcome-oriented">
+        </label>
     </div>
     <p class="small muted">Prompt</p>
     <textarea id="prompt" rows="5" style="width:100%;">Our revenue fell 12% due to low education and confidence in AI; propose a plan.</textarea>
     <div class="row" style="margin-top:8px">
       <button id="btnDraft">Draft</button>
-      <span id="draftInfo" class="muted"></span>
+        <span id="draftInfo" class="muted small"></span>
+      </div>
+      <h3 style="margin-top:12px;">Output</h3>
+      <div id="out" class="mono"></div>
+      <div id="meta" class="small muted" style="margin-top:6px;"></div>
     </div>
-    <h4>Output</h4>
-    <div id="out" class="mono"></div>
-    <div id="meta" class="small muted"></div>
+
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    let state = { sessionId: null, labelsFromChecklist: [] };
+    let state = { sessionId: null, labelsFromChecklist: [], grant: "EDG" };
 
-    // Load from localStorage on page load
+    // ---- Load persisted state ----
     if (localStorage.getItem("apiBase")) {
       $("apiBase").value = localStorage.getItem("apiBase");
     }
@@ -82,45 +459,81 @@
       $("btnChecklist").disabled = !state.sessionId;
       $("btnEvidenceList").disabled = !state.sessionId;
     }
+    if (localStorage.getItem("grant")) {
+      state.grant = localStorage.getItem("grant");
+      $("grantSelect").value = state.grant;
+      updateSectionLabel();
+    }
 
-    // Feature flag check - remove PSG option if not enabled
+    // ---- Environment / feature info ----
     (async () => {
       try {
         const base = $("apiBase").value.replace(/\/+$/,'');
-        const r = await fetch(base + '/v1/config/features');
-        const f = await r.json();
-        if (!f.feature_psg_enabled) {
-          document.querySelector('#psgOption')?.remove();
+        const r1 = await fetch(base + '/v1/config/features');
+        const f = await r1.json();
+        $("envPack").textContent = f.prompt_pack_active || "—";
+        $("envModel").textContent = f.model_worker || "—";
+        $("envPsg").textContent = f.feature_psg_enabled ? "enabled" : "disabled";
+
+        // optional prompts/active
+        try {
+          const r2 = await fetch(base + '/v1/prompts/active');
+          if (r2.ok) {
+            const p = await r2.json();
+            $("envLabel").textContent = p.appconfig_label || "default";
+            if (p.prompt_pack_active) $("envPack").textContent = p.prompt_pack_active;
+            if (p.model_worker) $("envModel").textContent = p.model_worker;
+          } else {
+            $("envLabel").textContent = "default";
+          }
+        } catch {
+          $("envLabel").textContent = "default";
         }
       } catch (error) {
-        console.log('Feature flag check failed:', error);
+        $("envLabel").textContent = "feature check failed";
       }
     })();
 
     function api(path, opts={}) {
       const base = $("apiBase").value.replace(/\/+$/,'');
-      // Save API base to localStorage
       localStorage.setItem("apiBase", base);
       return fetch(base + path, opts);
     }
 
-    // Ping
+    function updateSectionLabel() {
+      const lbl = (state.grant === "PSG") ? "business_impact (PSG)" : "business_case (EDG)";
+      $("sectionLabel").textContent = lbl;
+    }
+
+    // ---- Ping /health ----
     $("btnPing").onclick = async () => {
       $("pingOut").textContent = "…";
       try {
         const r = await api("/health");
         const ok = r.ok ? "OK" : "NOT OK";
         $("pingOut").textContent = ok;
-        $("pingOut").className = r.ok ? "ok" : "bad";
+        $("pingOut").className = r.ok ? "ok small" : "bad small";
       } catch(e) {
         $("pingOut").textContent = "error";
-        $("pingOut").className = "bad";
+        $("pingOut").className = "bad small";
       }
     };
 
-    // Create session
+    // Grant selector change
+    $("grantSelect").onchange = () => {
+      state.grant = $("grantSelect").value;
+      localStorage.setItem("grant", state.grant);
+      updateSectionLabel();
+    };
+
+    // ---- Create session ----
     $("btnSession").onclick = async () => {
-      const body = { grant: "EDG", company_name: "SmartGrant Pte Ltd" };
+      const grant = $("grantSelect").value || "EDG";
+      state.grant = grant;
+      localStorage.setItem("grant", grant);
+      updateSectionLabel();
+
+      const body = { grant, company_name: "SmartGrant Pte Ltd" };
       const r = await api("/v1/session", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
@@ -129,16 +542,17 @@
       const j = await r.json();
       state.sessionId = j.session_id;
       $("sid").textContent = state.sessionId || "(none)";
-      // Save session ID to localStorage
       localStorage.setItem("sid", state.sessionId);
       $("btnChecklist").disabled = !state.sessionId;
       $("btnEvidenceList").disabled = !state.sessionId;
       $("checklist").innerHTML = "";
       state.labelsFromChecklist = [];
       $("evidenceDebug").style.display = "none";
+      // clear validation banner
+      hideValidationBanner();
     };
 
-    // Get checklist and render upload items as checkboxes
+    // ---- Checklist ----
     $("btnChecklist").onclick = async () => {
       if (!state.sessionId) return;
       const r = await api(`/v1/session/${encodeURIComponent(state.sessionId)}/checklist`);
@@ -153,15 +567,17 @@
 
       items.forEach(item => {
         if (item.type === "upload") {
-          const label = item.label || item.id; // prefer .label, fallback .id
+          const label = item.label || item.id;
           state.labelsFromChecklist.push(label);
 
           const div = document.createElement("label");
           div.className = "chk";
           div.innerHTML = `
             <input type="checkbox" data-label="${label}">
-            <span><span class="pill">${label}</span>
-            <span class="muted small">${item.description || ""}</span></span>
+            <span>
+              <span class="pill">${label}</span>
+              <span class="muted small">${item.description || ""}</span>
+            </span>
           `;
           host.appendChild(div);
         }
@@ -172,7 +588,7 @@
       }
     };
 
-    // Optional: list evidence files detected server-side
+    // ---- Evidence inspector ----
     $("btnEvidenceList").onclick = async () => {
       if (!state.sessionId) return;
       const r = await api(`/v1/debug/evidence/${encodeURIComponent(state.sessionId)}?preview=120`);
@@ -183,68 +599,141 @@
         box.innerHTML = `<div class="muted small">No evidence text found for this session yet.</div>`;
       } else {
         box.innerHTML = `<strong>Evidence on server:</strong><br>` + items.map(it =>
-          `<div><span class="pill">${it.label}</span> <span class="muted small">(${it.chars||0} chars)</span><div class="small mono">${(it.preview||"").replaceAll("<","&lt;")}</div></div>`
+          `<div style="margin-top:6px;">
+             <span class="pill">${it.label}</span>
+             <span class="muted small">(${it.chars||0} chars)</span>
+             <div class="small mono">${(it.preview||"").replaceAll("<","&lt;")}</div>
+           </div>`
         ).join("");
       }
       box.style.display = "block";
     };
 
-    // Draft
+    // ---- Validation helpers ----
+    function showValidationBanner(checks) {
+      const banner = $("validationBanner");
+      const summary = $("validationSummary");
+      const details = $("validationDetails");
+
+      if (!checks || !checks.length) {
+        summary.textContent = "No validation issues detected.";
+        details.textContent = "";
+        banner.className = "validation-banner";
+        banner.style.display = "flex";
+        return;
+      }
+
+      const warnings = checks.filter(c => (c.level || "").toLowerCase() === "warning");
+      const errors = checks.filter(c => (c.level || "").toLowerCase() === "error");
+
+      summary.textContent =
+        `${warnings.length} warning${warnings.length!==1?"s":""}` +
+        `${errors.length ? `, ${errors.length} error${errors.length!==1?"s":""}` : ""}`;
+
+      details.textContent = checks.map(c => `${c.code}: ${c.message}`).join(" • ");
+
+      banner.className = "validation-banner warning";
+      banner.style.display = "flex";
+    }
+
+    function hideValidationBanner() {
+      const banner = $("validationBanner");
+      banner.style.display = "none";
+      $("validationSummary").textContent = "";
+      $("validationDetails").textContent = "";
+    }
+
+    // ---- Save facts & validate ----
+    $("btnValidate").onclick = async () => {
+      if (!state.sessionId) { alert("Create a session first"); return; }
+
+      const payload = {};
+      const eq = $("factEquity").value;
+      const to = $("factTurnover").value;
+      const hc = $("factHeadcount").value;
+      if (eq !== "") payload.local_equity_pct = Number(eq);
+      if (to !== "") payload.turnover = Number(to);
+      if (hc !== "") payload.headcount = Number(hc);
+
+      try {
+        // upsert facts
+        if (Object.keys(payload).length) {
+          await api(`/v1/session/${encodeURIComponent(state.sessionId)}/facts`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(payload)
+          });
+        }
+
+        // call validate
+        const r = await api(`/v1/session/${encodeURIComponent(state.sessionId)}/validate`, {
+          method: "POST"
+        });
+        const j = await r.json();
+        showValidationBanner(j.checks || []);
+      } catch (e) {
+        alert("Validation failed: " + e.message);
+      }
+    };
+
+    // ---- Draft ----
     $("btnDraft").onclick = async () => {
       if (!state.sessionId) { alert("Create a session first"); return; }
 
-      // Disable button while submitting
       $("btnDraft").disabled = true;
-      
+      hideValidationBanner();
+
       try {
-        // gather checked labels; if none, omit to use defaults
-        const checked = [...document.querySelectorAll('#checklist input[type="checkbox"]:checked')]
-                         .map(x => x.dataset.label);
+      const checked = [...document.querySelectorAll('#checklist input[type="checkbox"]:checked')]
+                       .map(x => x.dataset.label);
 
-        const inputs = {
-          style: $("style").value || "Formal, outcome-oriented",
-          length_limit: parseInt($("lenLimit").value || "300", 10),
-          prompt: $("prompt").value
-        };
-        const cap = parseInt($("cap").value || "0", 10);
-        if (cap > 0) inputs.evidence_char_cap = cap;
-        if (checked.length) inputs.evidence_labels = checked;
+      const inputs = {
+        style: $("style").value || "Formal, outcome-oriented",
+        length_limit: parseInt($("lenLimit").value || "300", 10),
+        prompt: $("prompt").value
+      };
+      const cap = parseInt($("cap").value || "0", 10);
+      if (cap > 0) inputs.evidence_char_cap = cap;
+      if (checked.length) inputs.evidence_labels = checked;
 
-        $("draftInfo").textContent = "Submitting…";
-        $("out").textContent = "";
-        $("meta").textContent = "";
+      $("draftInfo").textContent = "Submitting…";
+      $("out").textContent = "";
+      $("meta").textContent = "";
 
-        const r = await api("/v1/grants/edg/draft", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({
-            session_id: state.sessionId,
-            section_id: "business_case",
-            inputs
-          })
-        });
+        // decide section_id based on grant
+        const section_id = (state.grant === "PSG") ? "business_impact" : "business_case";
 
-        const j = await r.json().catch(()=>({ error:"Bad JSON" }));
-        if (!r.ok) {
-          $("draftInfo").textContent = "Error";
-          $("out").textContent = JSON.stringify(j, null, 2);
-          $("out").className = "mono bad";
-          return;
-        }
+        const r = await api("/v1/draft", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          session_id: state.sessionId,
+            section_id,
+          inputs
+        })
+      });
 
-        $("draftInfo").textContent = "Done";
-        $("out").className = "mono";
-        $("out").textContent = j.output || "";
-        const pills = (j.evidence_used || []).map(l => `<span class="pill">${l}</span>`).join("");
-        $("meta").innerHTML =
-          `Framework: <b>${j.framework}</b> &nbsp; | &nbsp; Evidence used: ${pills} &nbsp; | &nbsp; Score: <b>${j.evaluation?.score ?? "-"}</b>`;
+      const j = await r.json().catch(()=>({ error:"Bad JSON" }));
+      if (!r.ok) {
+        $("draftInfo").textContent = "Error";
+        $("out").textContent = JSON.stringify(j, null, 2);
+        $("out").className = "mono bad";
+        return;
+      }
+
+      $("draftInfo").textContent = "Done";
+      $("out").className = "mono";
+      $("out").textContent = j.output || "";
+      const pills = (j.evidence_used || []).map(l => `<span class="pill">${l}</span>`).join("");
+      $("meta").innerHTML =
+          `Framework: <b>${j.framework}</b>
+           &nbsp; | &nbsp; Evidence used: ${pills || "defaults"}
+           &nbsp; | &nbsp; Score: <b>${j.evaluation?.score ?? "-"}</b>`;
       } catch (error) {
-        // Handle any unexpected errors
         $("draftInfo").textContent = "Error";
         $("out").textContent = "Unexpected error: " + error.message;
         $("out").className = "mono bad";
       } finally {
-        // Re-enable button
         $("btnDraft").disabled = false;
       }
     };
