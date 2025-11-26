@@ -20,6 +20,7 @@ let state = {
   evidenceDetected: [],
   evidenceSelected: [],
   evidenceUploadStatus: {}, // label -> "uploaded" | "detected"
+  evidencePollingTimers: {}, // label -> timerId
   facts: {},
   validationChecks: [],
   solutionAnchor: "",
@@ -349,7 +350,7 @@ function renderStep1() {
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div class="mb-6">
         <h2 class="text-2xl font-bold text-gray-900 mb-2">Evidence Collection</h2>
-        <p class="text-sm text-gray-600">Upload required documents. Evidence will be processed and available for drafting.</p>
+        <p class="text-sm text-gray-600">Upload required documents. Evidence will be automatically checked and processed. Status updates automatically when evidence is detected.</p>
       </div>
 
       <div class="space-y-4 mb-6">
@@ -381,11 +382,15 @@ function renderStep1() {
                   const displayLabel = label.replace(/_/g, " "); // Human-readable display only
                   const uploadStatus = state.evidenceUploadStatus[label] || "not_uploaded";
                   const isDetected = detectedLabels.has(label);
+                  const isPolling = !!state.evidencePollingTimers[label];
                   let statusText = "Not uploaded";
                   let statusClass = "bg-gray-100 text-gray-700";
                   if (isDetected) {
                     statusText = "Detected";
                     statusClass = "bg-green-100 text-green-700";
+                  } else if (isPolling) {
+                    statusText = "Checking for evidence…";
+                    statusClass = "bg-blue-100 text-blue-700";
                   } else if (uploadStatus === "uploaded") {
                     statusText = "Uploaded (pending parse)";
                     statusClass = "bg-yellow-100 text-yellow-700";
@@ -768,6 +773,12 @@ function renderStep5() {
 
 function navigateToStep(step) {
   if (step < 0 || step >= STEP_NAMES.length) return;
+  
+  // Stop polling when navigating away from Step 1 (Evidence Collection)
+  if (state.activeStep === 1 && step !== 1) {
+    stopAllEvidencePolling();
+  }
+  
   state.activeStep = step;
   
   // Update step status: mark current step as in_progress if it's still todo
@@ -790,9 +801,18 @@ async function handleCreateSession() {
   }
 
   try {
+    // Stop any existing polling when creating a new session
+    stopAllEvidencePolling();
+    
     const body = { grant, company_name: "SmartGrant Pte Ltd" };
     const result = await apiPost("/v1/session", body);
     state.sessionId = result.session_id;
+    
+    // Reset evidence-related state for new session
+    state.evidenceDetected = [];
+    state.evidenceUploadStatus = {};
+    state.evidencePollingTimers = {};
+    
     persistState();
 
     // Auto-fetch checklist
@@ -871,10 +891,8 @@ async function handleFileSelect(label, input) {
     state.evidenceUploadStatus[label] = "uploaded";
     renderStepPanel();
 
-    // Optional non-blocking alert
-    setTimeout(() => {
-      alert("Uploaded. Parsing will take a few seconds; click Refresh Evidence Detected.");
-    }, 100);
+    // Start automatic polling for evidence detection
+    startEvidencePolling(label);
 
   } catch (error) {
     // Failure: mark as error
@@ -899,6 +917,11 @@ async function handleRefreshEvidence() {
     state.evidenceDetected.forEach(item => {
       if (state.evidenceUploadStatus[item.label] !== "detected") {
         state.evidenceUploadStatus[item.label] = "detected";
+        // Stop polling for this label if it was being polled
+        if (state.evidencePollingTimers[item.label]) {
+          clearInterval(state.evidencePollingTimers[item.label]);
+          delete state.evidencePollingTimers[item.label];
+        }
       }
     });
 
@@ -907,6 +930,76 @@ async function handleRefreshEvidence() {
   } catch (e) {
     alert(`Failed to refresh evidence: ${e.message}`);
   }
+}
+
+// ============================================================================
+// Evidence Polling Functions
+// ============================================================================
+
+function startEvidencePolling(label) {
+  // Don't start if already polling, already detected, or no session
+  if (!state.sessionId || 
+      state.evidencePollingTimers[label] || 
+      state.evidenceUploadStatus[label] === "detected") {
+    return;
+  }
+
+  const maxAttempts = 20; // 20 attempts = ~60 seconds at 3s intervals
+  let attempts = 0;
+
+  const poll = async () => {
+    attempts++;
+    
+    try {
+      const result = await apiGet(`/v1/debug/evidence/${encodeURIComponent(state.sessionId)}?preview=120`);
+      state.evidenceDetected = result.items || [];
+      
+      const detectedLabels = new Set(state.evidenceDetected.map(e => e.label));
+      
+      if (detectedLabels.has(label)) {
+        // Evidence detected! Stop polling and update status
+        state.evidenceUploadStatus[label] = "detected";
+        clearInterval(state.evidencePollingTimers[label]);
+        delete state.evidencePollingTimers[label];
+        renderStepPanel();
+        return;
+      }
+      
+      // Not detected yet - continue polling if under max attempts
+      if (attempts >= maxAttempts) {
+        // Timeout - stop polling but keep status as "uploaded"
+        clearInterval(state.evidencePollingTimers[label]);
+        delete state.evidencePollingTimers[label];
+        renderStepPanel();
+        return;
+      }
+      
+      // Update UI periodically (every 3rd attempt) to show we're still checking
+      // This provides visual feedback without too much re-rendering
+      if (attempts % 3 === 0) {
+        renderStepPanel();
+      }
+      
+    } catch (e) {
+      // On error, stop polling but don't change status
+      clearInterval(state.evidencePollingTimers[label]);
+      delete state.evidencePollingTimers[label];
+      console.warn(`Polling error for ${label}:`, e);
+      // Re-render to remove "Checking..." status
+      renderStepPanel();
+    }
+  };
+
+  // Start polling immediately, then every 3 seconds
+  poll();
+  state.evidencePollingTimers[label] = setInterval(poll, 3000);
+}
+
+function stopAllEvidencePolling() {
+  Object.keys(state.evidencePollingTimers).forEach(label => {
+    clearInterval(state.evidencePollingTimers[label]);
+    delete state.evidencePollingTimers[label];
+  });
 }
 
 async function handleSaveFacts() {
@@ -1161,6 +1254,11 @@ window.handleDraftSection = handleDraftSection;
 window.handleDraftAll = handleDraftAll;
 window.handleCopySection = handleCopySection;
 window.handleCopyAll = handleCopyAll;
+
+// Cleanup polling on page unload
+window.addEventListener("beforeunload", () => {
+  stopAllEvidencePolling();
+});
 
 // Initialize on load
 if (document.readyState === "loading") {
