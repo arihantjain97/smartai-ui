@@ -378,6 +378,7 @@ function renderStep1() {
               <tbody class="bg-white divide-y divide-gray-200">
                 ${uploadTasks.map(task => {
                   const label = task.id || task.label;
+                  const displayLabel = label.replace(/_/g, " "); // Human-readable display only
                   const uploadStatus = state.evidenceUploadStatus[label] || "not_uploaded";
                   const isDetected = detectedLabels.has(label);
                   let statusText = "Not uploaded";
@@ -397,7 +398,7 @@ function renderStep1() {
                   }
                   return `
                     <tr>
-                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${label}</td>
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${displayLabel}</td>
                       <td class="px-4 py-3">
                         <input
                           type="file"
@@ -421,7 +422,22 @@ function renderStep1() {
       <div class="border-t border-gray-200 pt-4">
         <details class="cursor-pointer">
           <summary class="text-sm font-medium text-gray-700 hover:text-gray-900">Evidence Inspector</summary>
-          <div id="evidenceInspector" class="mt-4 space-y-2 text-sm"></div>
+          <div id="evidenceInspector" class="mt-4 space-y-2 text-sm">
+            ${state.evidenceDetected.length === 0 ? `
+              <p class="text-gray-500 italic text-sm">No evidence detected yet.</p>
+            ` : state.evidenceDetected.map(item => {
+              const displayLabel = item.label.replace(/_/g, " "); // Human-readable display only
+              return `
+                <div class="border border-gray-200 rounded p-2 bg-gray-50">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">${displayLabel}</span>
+                    <span class="text-xs text-gray-500">${item.chars || 0} chars</span>
+                  </div>
+                  <div class="text-xs text-gray-600 font-mono whitespace-pre-wrap">${(item.preview || "").replace(/</g, "&lt;")}</div>
+                </div>
+              `;
+            }).join("")}
+          </div>
         </details>
       </div>
     </div>
@@ -886,24 +902,7 @@ async function handleRefreshEvidence() {
       }
     });
 
-    // Update evidence inspector
-    const inspector = document.getElementById("evidenceInspector");
-    if (inspector) {
-      if (state.evidenceDetected.length === 0) {
-        inspector.innerHTML = `<p class="text-gray-500 italic text-sm">No evidence detected yet.</p>`;
-      } else {
-        inspector.innerHTML = state.evidenceDetected.map(item => `
-          <div class="border border-gray-200 rounded p-2 bg-gray-50">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">${item.label}</span>
-              <span class="text-xs text-gray-500">${item.chars || 0} chars</span>
-            </div>
-            <div class="text-xs text-gray-600 font-mono whitespace-pre-wrap">${(item.preview || "").replace(/</g, "&lt;")}</div>
-          </div>
-        `).join("");
-      }
-    }
-
+    // Re-render to update Evidence Inspector and status pills
     renderStepPanel();
   } catch (e) {
     alert(`Failed to refresh evidence: ${e.message}`);
