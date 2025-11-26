@@ -247,6 +247,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChecklistResponse'
 
+  /v1/session/{sid}/checklisttest:
+    get:
+      tags: [sessions]
+      summary: Get dynamically-generated checklist of tasks for a session (test endpoint)
+      description: |
+        Returns a dynamically-generated list of tasks (uploads + drafts) for the given session,
+        built from `pack.yml` configuration and the Azure Search template index.
+
+        This is a **test endpoint** for verification before replacing the original `/checklist` endpoint.
+        It provides the same functionality as `/checklist` but with dynamic generation capabilities.
+
+        **Key differences from `/checklist`:**
+        - Uses `pack` field instead of `grant` (semantic rename)
+        - Dynamically built from `pack.yml` and Azure Search index
+        - Supports automatic variant resolution based on session context
+        - Falls back to hardcoded list on any error (graceful degradation)
+        - Only includes approved templates (respects template-level status)
+
+        **Examples:**
+        - For EDG: upload ACRA, upload financials, draft consultancy scope,
+          draft about_project (with section_variant), draft expansion_plan.
+        - For PSG: upload vendor quotation, upload cost breakdown, draft business_impact, etc.
+
+        The `section_variant` field is used for EDG sub-flows (e.g., I&P, Market Access).
+        Variants are automatically resolved based on session data when available.
+      parameters:
+        - $ref: '#/components/parameters/SessionIdPath'
+      responses:
+        "200":
+          description: Dynamically-generated checklist of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistTestResponse'
+        "404":
+          description: Session not found
+
   /v1/draft:
     post:
       tags: [drafting]
@@ -606,6 +643,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ChecklistTask'
+
+    ChecklistTestResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: Session identifier.
+        pack:
+          type: string
+          description: Effective pack identifier for this session (uppercased, e.g. "EDG", "PSG").
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChecklistTask'
+          description: |
+            Dynamically-generated list of tasks (uploads + drafts) built from pack.yml
+            configuration and Azure Search template index. Tasks are ordered with uploads
+            first, followed by draft sections in the order specified in pack.yml.
 
     DraftReq:
       type: object

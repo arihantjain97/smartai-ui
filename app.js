@@ -794,7 +794,7 @@ async function handleCreateSession() {
 async function handleLoadChecklist() {
   if (!state.sessionId) return;
   try {
-    const result = await apiGet(`/v1/session/${encodeURIComponent(state.sessionId)}/checklist`);
+    const result = await apiGet(`/v1/session/${encodeURIComponent(state.sessionId)}/checklisttest`);
     const tasks = result.tasks || [];
     state.checklist.uploads = tasks.filter(t => t.type === "upload");
     state.checklist.drafts = tasks.filter(t => t.type === "draft");
